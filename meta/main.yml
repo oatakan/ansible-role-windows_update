@@ -1,0 +1,30 @@
+---
+galaxy_info:
+  author: Orcun Atakan
+  description: Ansible galaxy role for updating Microsoft Windows systems
+  role_name: windows_update
+  company: Red Hat
+
+  license: MIT
+
+  min_ansible_version: 2.5
+
+  platforms:
+    - name: Windows
+      versions:
+        - all
+
+  cloud_platforms:
+    - amazon
+    - google
+    - azure
+    - azure
+    - vmware
+    - ovirt
+
+  galaxy_tags:
+    - windows
+    - update
+    - template
+
+dependencies: []
