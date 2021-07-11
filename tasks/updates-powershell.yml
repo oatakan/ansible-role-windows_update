@@ -16,9 +16,11 @@
     - debug:
         msg: |
           {{ inventory_hostname }} has {{ available_updates.found_update_count }} updates available.
-          {% for key, value in available_updates.updates.items() %}
-            - {{ value.title }}
+          {% for update in updates %}
+            - {{ update.title }}
           {% endfor %}
+      vars:
+        updates: "{{ (available_updates.updates.values() | list) if (available_updates.updates is mapping) else (available_updates.updates) }}"
       when: available_updates.updates is defined
 
     - block:
@@ -67,9 +69,11 @@
     - debug:
         msg: |
           {{ inventory_hostname }} has {{ missing_updates.found_update_count }} updates still missing.
-          {% for key, value in missing_updates.updates.items() %}
-            - {{ value.title }}
+          {% for update in updates %}
+            - {{ update.title }}
           {% endfor %}
+      vars:
+        updates: "{{ (missing_updates.updates.values() | list) if (missing_updates.updates is mapping) else (missing_updates.updates) }}"
       when: missing_updates.updates is defined
 
     - block:
