@@ -1,5 +1,6 @@
 ---
 
+update_retry_count: 0
 update_retry_limit: 10
 win_update_category_names:
   - CriticalUpdates

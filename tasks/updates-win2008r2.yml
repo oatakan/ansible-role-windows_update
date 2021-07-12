@@ -49,7 +49,7 @@
 - name: check for available updates
   win_updates:
     category_names: "{{ win_update_category_names }}"
-    reject_list: "{{ win_update_blacklist | default(omit) }}"
+    blacklist: "{{ win_update_blacklist | default(omit) }}"
     state: searched
   register: available_updates
 
