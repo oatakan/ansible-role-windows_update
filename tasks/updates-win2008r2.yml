@@ -30,8 +30,8 @@
   rescue:
     - name: install hotfix using shell
       win_shell: '{{ hotfix_download_location }}\{{ item.file }} /quiet /norestart'
-        register: hotfix_install_group_1
-        loop: "{{ hotfixes_group_1 }}"
+      register: hotfix_install_group_1
+      loop: "{{ hotfixes_group_1 }}"
 
 - name: install hotfix (PS == 3)
   win_shell: '{{ hotfix_download_location }}\{{ item.file }} /quiet /norestart'
