@@ -6,6 +6,7 @@
     state: present
     version: 10.0.17134.0
   register: install_windows_adk_deploy
+  notify: ensure Windows ADK with DISM is removed
 
 - name: ensure PATH contains Windows ADK
   win_path:
@@ -82,8 +83,3 @@
 - name: list missing updates
   debug:
     var: available_updates
-
-- name: make sure Windows ADK with DISM for Server 2008 R2 is not installed
-  win_chocolatey:
-    name: windows-adk-deploy
-    state: absent
