@@ -9,6 +9,10 @@ win_update_category_names:
   - UpdateRollups
   - Updates
 
+win_update_reject_list: []
+win_update_accept_list: []
+failed_kb: []
+
 hotfix_download_location: "{{ ansible_env.TEMP }}"
 
 hotfixes_group_1:
