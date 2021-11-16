@@ -13,9 +13,10 @@ win_update_reject_list: []
 win_update_accept_list: []
 failed_kb: []
 
-hotfix_download_location: "{{ ansible_env.TEMP }}"
+temp_directory: "{{ ansible_env.TEMP }}"
+hotfix_download_location: "{{ temp_directory }}"
 
-hotfixes_group_1:
+hotfixes:
   - kb: KB3020369
     file: Windows6.1-KB3020369-x64.msu
     url: https://download.microsoft.com/download/F/D/3/FD3728D5-0D2F-44A6-B7DA-1215CC0C9B75/Windows6.1-KB3020369-x64.msu

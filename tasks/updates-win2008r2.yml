@@ -27,44 +27,58 @@
     state: present
     elements: "C:\\Program Files (x86)\\Windows Kits\\10\\Assessment and Deployment Kit\\Deployment Tools\\amd64\\DISM"
 
-- name: download hotfix group 1
-  win_get_url:
-    url: '{{ item.url }}'
-    dest: '{{ hotfix_download_location }}\{{ item.file }}'
-  loop: "{{ hotfixes_group_1 }}"
+- name: check installed kbs
+  win_shell: wmic qfe | ConvertTo-Json
+  register: installed_kbs
+
+- name: missing hotfixes
+  set_fact:
+    missing_hotfixes: "{{ hotfixes | json_query(query) }}"
+  vars:
+    set_installed_kbs: "{{ (installed_kbs.stdout | from_json) | reject('match', '^$') | reject('match', '^Caption *') | map('regex_replace', '^.* (KB[0-9]+) .*', '\\1') | list }}"
+    query: "[?!contains(`{{ set_installed_kbs }}`, kb)]"
 
 - block:
-    - name: install hotfix group 1 (PS >= 4)
-      win_hotfix:
-        source: '{{ hotfix_download_location }}\{{ item.file }}'
-        state: present
-      register: hotfix_install_group_1
-      loop: "{{ hotfixes_group_1 }}"
+    - name: download hotfixes
+      win_get_url:
+        url: '{{ item.url }}'
+        dest: '{{ hotfix_download_location }}\{{ item.file }}'
+      loop: "{{ missing_hotfixes }}"
+      register: download_hotfix
+      until: download_hotfix is success
+      delay: 3
+      retries: 5
+
+    - include_tasks: hotfix_ps3.yml
+      loop: "{{ missing_hotfixes }}"
+      loop_control:
+        loop_var: hotfix
+      when: ansible_powershell_version is version('3', '==')
+      vars:
+        hotfix_download: "{{ hotfix }}"
+        hotfix_temp_directory: "{{ hotfix_download_location }}"
+
+    - include_tasks: hotfix_ps4.yml
+      loop: "{{ missing_hotfixes }}"
+      loop_control:
+        loop_var: hotfix
       when: ansible_powershell_version is version('4', '>=')
-  rescue:
-    - name: install hotfix using shell
-      win_shell: '{{ hotfix_download_location }}\{{ item.file }} /quiet /norestart'
-      register: hotfix_install_group_1
-      loop: "{{ hotfixes_group_1 }}"
+      vars:
+        hotfix_download: "{{ hotfix }}"
+        hotfix_temp_directory: "{{ hotfix_download_location }}"
 
-- name: install hotfix (PS == 3)
-  win_shell: '{{ hotfix_download_location }}\{{ item.file }} /quiet /norestart'
-  register: hotfix_install_group_1
-  loop: "{{ hotfixes_group_1 }}"
-  when: ansible_powershell_version is version('3', '==')
+    - name: reboot
+      win_reboot:
+      when:
+        - hotfix_install is defined
+        - hotfix_install is changed
 
-- name: debug hotfix installation result
-  debug:
-    var: hotfix_install_group_1
-
-- name: ensure hotfix file is removed (group 1)
-  win_file:
-    path: '{{ hotfix_download_location }}\{{ item.file }}'
-    state: absent
-  loop: "{{ hotfixes_group_1 }}"
-
-- name: reboot from starting update
-  win_reboot:
+  always:
+    - name: ensure hotfix files are removed
+      win_file:
+        path: '{{ hotfix_download_location }}\{{ item.file }}'
+        state: absent
+      loop: "{{ missing_hotfixes }}"
 
 - name: check for available updates
   win_updates:
