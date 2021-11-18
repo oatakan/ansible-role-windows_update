@@ -84,5 +84,10 @@
       vars:
         current_update_count: "{{ missing_updates.found_update_count | default(installed_updates.found_update_count) | default('-') }}"
 
+    - name: ensure system is reachable
+      wait_for_connection:
+        sleep: 10
+        timeout: 600
+
     - include_tasks: updates-with-retry.yml
       when: ((update_retry_limit | int) - (update_retry_count | int) > 0)
