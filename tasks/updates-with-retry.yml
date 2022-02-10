@@ -3,10 +3,15 @@
 - name: update over multiple reboots
   block:
     - block:
+        - name: set reject list
+          set_fact:
+            _reject_list: "{{ (win_update_reject_list | default([])) + (failed_kb | default([])) }}"
+          when: (win_update_reject_list | length) or (failed_kb | length)
+
         - name: install all windows updates
           win_updates:
             category_names: "{{ win_update_category_names }}"
-            reject_list: "{{ (win_update_reject_list | default([])) + (failed_kb | default([])) }}"
+            reject_list: "{{ _reject_list | default(omit) }}"
             accept_list: "{{ win_update_accept_list | default(omit) }}"
             reboot: yes
           register: installed_updates
@@ -41,7 +46,7 @@
       win_updates:
         category_names: "{{ win_update_category_names }}"
         reject_list: "{{ win_update_reject_list | default(omit) }}"
-        accept_list: "{{ failed_kb | default([]) }}"
+        accept_list: "{{ failed_kb | default(omit) }}"
         reboot: yes
       register: installed_updates_retry_skipped
       when:
