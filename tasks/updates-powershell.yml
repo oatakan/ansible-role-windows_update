@@ -4,6 +4,7 @@
   block:
     - name: check for available updates
       win_updates:
+        server_selection: "{{ win_update_server_selection }}"
         category_names:
           - CriticalUpdates
           - DefinitionUpdates
@@ -56,6 +57,7 @@
       when: update_reboot_required_key.exists
 
     - name: check for missing updates
+      server_selection: "{{ win_update_server_selection }}"
       win_updates:
         category_names:
           - CriticalUpdates

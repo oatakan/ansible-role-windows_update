@@ -1,5 +1,8 @@
 ---
 
+- debug:
+    msg: "win update server: {{ win_update_server }}"
+
 - name: disable firewall for Domain, Public and Private profiles
   win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
   when: "'Windows Server 2012' in ansible_distribution"

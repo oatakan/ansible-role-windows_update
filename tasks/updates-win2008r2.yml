@@ -82,6 +82,7 @@
 
 - name: check for available updates
   win_updates:
+    server_selection: "{{ win_update_server_selection }}"
     category_names: "{{ win_update_category_names }}"
     reject_list: "{{ win_update_reject_list | default(omit) }}"
     state: searched
@@ -104,6 +105,7 @@
 
 - name: check for missing updates.
   win_updates:
+    server_selection: "{{ win_update_server_selection }}"
     state: searched
   register: available_updates
 
