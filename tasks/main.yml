@@ -2,6 +2,7 @@
 
 - debug:
     msg: "win update server: {{ win_update_server }}"
+  when: win_update_server is defined
 
 - name: disable firewall for Domain, Public and Private profiles
   win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
