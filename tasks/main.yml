@@ -4,7 +4,7 @@
     msg: "win update server: {{ win_update_server }}"
   when: win_update_server is defined
 
-block:
+- block:
   - name: disable firewall for Domain, Public and Private profiles
     win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
     when: 
@@ -48,7 +48,7 @@ when: windows_update_disable_firewall | bool
     - used_space_before_update.stdout is defined
     - used_space_after_update.stdout is defined
 
-block:
+- block:
   - name: enabled firewall for Domain, Public and Private profiles
     win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
     when: 
