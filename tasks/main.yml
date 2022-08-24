@@ -4,17 +4,17 @@
     msg: "win update server: {{ win_update_server }}"
   when: win_update_server is defined
 
-block:
-  - name: disable firewall for Domain, Public and Private profiles
-    win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
-    when: 
-      - "'Windows Server 2012' in ansible_distribution"
-  
-  - name: disable firewall for Domain, Public and Private profiles
-    win_shell: netsh advfirewall set  allprofiles state off
-    when: 
-      - "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
-when: windows_update_disable_firewall | bool
+- name: disable firewall for Domain, Public and Private profiles
+  win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+  when: 
+    - "'Windows Server 2012' in ansible_distribution"
+    - windows_update_disable_firewall | bool
+
+- name: disable firewall for Domain, Public and Private profiles
+  win_shell: netsh advfirewall set  allprofiles state off
+  when: 
+    - "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
+    - windows_update_disable_firewall | bool
 
 - name: get used space before update
   win_shell: Get-PSDrive C | Select-Object Used | ConvertTo-Json
@@ -48,14 +48,14 @@ when: windows_update_disable_firewall | bool
     - used_space_before_update.stdout is defined
     - used_space_after_update.stdout is defined
 
-block:
-  - name: enabled firewall for Domain, Public and Private profiles
-    win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
-    when: 
-      - "'Windows Server 2012' in ansible_distribution"
-  
-  - name: enable firewall for Domain, Public and Private profiles
-    win_shell: netsh advfirewall set  allprofiles state on
-    when: 
-      - "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
-when: windows_update_disable_firewall | bool
+- name: enabled firewall for Domain, Public and Private profiles
+  win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+  when: 
+    - "'Windows Server 2012' in ansible_distribution"
+    - windows_update_disable_firewall | bool
+
+- name: enable firewall for Domain, Public and Private profiles
+  win_shell: netsh advfirewall set  allprofiles state on
+  when: 
+    - "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
+    - windows_update_disable_firewall | bool
