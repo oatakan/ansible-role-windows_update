@@ -12,6 +12,7 @@ win_update_category_names:
 win_update_reject_list: []
 win_update_accept_list: []
 win_update_server_selection: default
+win_update_disable_firewall: yes
 failed_kb: []
 
 temp_directory: "{{ ansible_env.TEMP }}"
