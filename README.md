@@ -14,6 +14,10 @@ Role Variables
 Dependencies
 ------------
 
+A list of roles that this role utilizes:
+
+- oatakan.windows_hotfix
+
 Example Playbook
 ----------------
 

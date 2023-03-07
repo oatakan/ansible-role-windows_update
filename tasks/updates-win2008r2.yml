@@ -1,31 +1,6 @@
 ---
 
-- block:
-    - name: ensure Windows ADK with DISM is installed
-      win_package:
-        path: https://go.microsoft.com/fwlink/?linkid=873065 # version 10.0.17134.0
-        product_id: '{d794748d-72e9-45d7-9ab7-83d6c4c80f7f}'
-        expected_return_code:
-          - 0
-          - 3010
-        arguments: /quiet /norestart /features OptionId.DeploymentTools OptionId.WindowsPreinstallationEnvironment OptionId.ImagingAndConfigurationDesigner OptionId.UserStateMigrationTool
-      notify:
-        - get Windows ADK uninstall command
-        - uninstall Windows ADK
-  rescue:
-    - name: ensure Windows ADK with DISM is installed (chocolatey)
-      win_chocolatey:
-        name: windows-adk-deploy
-        state: present
-        version: 10.0.17134.0
-      register: install_windows_adk_deploy
-      notify: ensure Windows ADK with DISM is removed
-
-- name: ensure PATH contains Windows ADK
-  win_path:
-    scope: machine
-    state: present
-    elements: "C:\\Program Files (x86)\\Windows Kits\\10\\Assessment and Deployment Kit\\Deployment Tools\\amd64\\DISM"
+- include_tasks: install_dism.yml
 
 - name: check installed kbs
   win_shell: wmic qfe | ConvertTo-Json
@@ -38,47 +13,11 @@
     set_installed_kbs: "{{ (installed_kbs.stdout | from_json) | reject('match', '^$') | reject('match', '^Caption *') | map('regex_replace', '^.* (KB[0-9]+) .*', '\\1') | list }}"
     query: "[?!contains(`{{ set_installed_kbs }}`, kb)]"
 
-- block:
-    - name: download hotfixes
-      win_get_url:
-        url: '{{ item.url }}'
-        dest: '{{ hotfix_download_location }}\{{ item.file }}'
-      loop: "{{ missing_hotfixes }}"
-      register: download_hotfix
-      until: download_hotfix is success
-      delay: 3
-      retries: 5
-
-    - include_tasks: hotfix_ps3.yml
-      loop: "{{ missing_hotfixes }}"
-      loop_control:
-        loop_var: hotfix
-      when: ansible_powershell_version is version('3', '==')
-      vars:
-        hotfix_download: "{{ hotfix }}"
-        hotfix_temp_directory: "{{ hotfix_download_location }}"
-
-    - include_tasks: hotfix_ps4.yml
-      loop: "{{ missing_hotfixes }}"
-      loop_control:
-        loop_var: hotfix
-      when: ansible_powershell_version is version('4', '>=')
-      vars:
-        hotfix_download: "{{ hotfix }}"
-        hotfix_temp_directory: "{{ hotfix_download_location }}"
-
-    - name: reboot
-      win_reboot:
-      when:
-        - hotfix_install is defined
-        - hotfix_install is changed
-
-  always:
-    - name: ensure hotfix files are removed
-      win_file:
-        path: '{{ hotfix_download_location }}\{{ item.file }}'
-        state: absent
-      loop: "{{ missing_hotfixes }}"
+- include_role:
+    name: "{{ windows_hotfix_role }}"
+  loop: "{{ missing_hotfixes }}"
+  loop_control:
+    loop_var: hotfix
 
 - name: check for available updates
   win_updates:

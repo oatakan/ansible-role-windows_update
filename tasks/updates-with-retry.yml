@@ -14,8 +14,23 @@
             category_names: "{{ win_update_category_names }}"
             reject_list: "{{ _reject_list | default(omit) }}"
             accept_list: "{{ win_update_accept_list | default(omit) }}"
-            reboot: yes
+            reboot: false
+          async: 7200
+          poll: 0
+          register: installed_updates_async
+
+        - name: wait for updates to finish
+          async_status:
+            jid: "{{ installed_updates_async.ansible_job_id }}"
           register: installed_updates
+          until: installed_updates.finished
+          retries: "{{ install_updates_retry_limit }}"
+          delay: 30
+
+        - name: reboot the system if required
+          win_reboot:
+            reboot_timeout: 7200
+          when: installed_updates.reboot_required
 
       rescue:
         - name: reboot the system to recover from a failed update
@@ -42,15 +57,30 @@
         delay: 60
         sleep: 10
         timeout: 600
+    - block:
+        - name: work on any skipped KB
+          win_updates:
+            server_selection: "{{ win_update_server_selection }}"
+            category_names: "{{ win_update_category_names }}"
+            reject_list: "{{ win_update_reject_list | default(omit) }}"
+            accept_list: "{{ failed_kb | default(omit) }}"
+            reboot: false
+          async: 7200
+          poll: 0
+          register: installed_updates_retry_skipped_async
 
-    - name: work on any skipped KB
-      win_updates:
-        server_selection: "{{ win_update_server_selection }}"
-        category_names: "{{ win_update_category_names }}"
-        reject_list: "{{ win_update_reject_list | default(omit) }}"
-        accept_list: "{{ failed_kb | default(omit) }}"
-        reboot: yes
-      register: installed_updates_retry_skipped
+        - name: wait for updates to finish
+          async_status:
+            jid: "{{ installed_updates_retry_skipped_async.ansible_job_id }}"
+          register: installed_updates_retry_skipped
+          until: installed_updates_retry_skipped.finished
+          retries: "{{ install_updates_retry_limit }}"
+          delay: 30
+
+        - name: reboot the system if required
+          win_reboot:
+            reboot_timeout: 7200
+          when: installed_updates_retry_skipped.reboot_required
       when:
         - failed_kb is defined
         - failed_kb | length > 0
