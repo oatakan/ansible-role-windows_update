@@ -19,6 +19,8 @@ win_update_server_selection: default
 win_update_disable_firewall: yes
 failed_kb: []
 
+windows_update_disable_firewall: true
+
 temp_directory: "{{ ansible_env.TEMP }}"
 
 windows_hotfix_role: oatakan.windows_hotfix
