@@ -18,9 +18,11 @@
     updates: "{{ (available_updates.updates.values() | list) if (available_updates.updates is mapping) else (available_updates.updates) }}"
   when: available_updates.updates is defined
 
-- include_tasks: updates-with-retry.yml
-  vars:
+- name: reset update count
+  set_fact:
     update_retry_count: 0
+
+- include_tasks: updates-with-retry.yml
   when:
     - available_updates.updates is defined
     - available_updates.found_update_count > 0
