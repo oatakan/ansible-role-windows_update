@@ -19,6 +19,8 @@
   when: available_updates.updates is defined
 
 - include_tasks: updates-with-retry.yml
+  vars:
+    update_retry_count: 0
   when:
     - available_updates.updates is defined
     - available_updates.found_update_count > 0
