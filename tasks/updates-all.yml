@@ -27,6 +27,17 @@
     - available_updates.updates is defined
     - available_updates.found_update_count > 0
 
+# see https://learn.microsoft.com/en-us/sharepoint/troubleshoot/administration/800703fa-illegal-operation-error
+# error code 0x800703FA happens with some updates when user is not logged in
+# remove the registry key if added during the update
+- include_tasks: force_user_registry.yml
+  vars:
+    task_state: absent
+  when:
+    - disable_force_unload_registry is defined
+    - disable_force_unload_registry is not skipped
+    - disable_force_unload_registry is changed
+
 - name: check for missing updates
   win_updates:
     server_selection: "{{ win_update_server_selection }}"

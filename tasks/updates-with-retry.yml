@@ -33,6 +33,18 @@
           when: installed_updates.reboot_required
 
       rescue:
+        # see https://learn.microsoft.com/en-us/sharepoint/troubleshoot/administration/800703fa-illegal-operation-error
+        # error code 0x800703FA happens with some updates when user is not logged in
+        # add the registry key to disable forcefully unloading users registry at user logoff
+        - include_tasks: force_user_registry.yml
+          vars:
+            task_state: present
+          when:
+            - installed_updates is defined
+            - installed_updates is failed
+            - installed_updates.msg is defined
+            - ('0x800703FA' in installed_updates.msg)
+
         - name: reboot the system to recover from a failed update
           win_reboot:
             reboot_timeout: 7200
