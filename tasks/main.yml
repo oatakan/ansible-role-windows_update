@@ -21,6 +21,13 @@
   register: used_space_before_update
   ignore_errors: yes
 
+- name: reset some facts
+  set_fact:
+    update_retry_count: 0
+    missing_hotfixes: []
+    failed_kb: []
+    _reject_list: []
+
 - include_tasks: updates-all.yml
   when:
     - "'Windows Server 2008' not in ansible_distribution"
