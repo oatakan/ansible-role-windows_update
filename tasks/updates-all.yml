@@ -1,12 +1,23 @@
 ---
+- block:
+    - name: check for available updates
+      win_updates:
+        category_names: "{{ win_update_category_names }}"
+        reject_list: "{{ win_update_reject_list | default(omit) }}"
+        server_selection: "{{ win_update_server_selection }}"
+        state: searched
+      register: available_updates
+  rescue:
+    - name: ensure we have connection
+      wait_for_connection:
 
-- name: check for available updates
-  win_updates:
-    category_names: "{{ win_update_category_names }}"
-    reject_list: "{{ win_update_reject_list | default(omit) }}"
-    server_selection: "{{ win_update_server_selection }}"
-    state: searched
-  register: available_updates
+    - name: check for available updates (retry)
+      win_updates:
+        category_names: "{{ win_update_category_names }}"
+        reject_list: "{{ win_update_reject_list | default(omit) }}"
+        server_selection: "{{ win_update_server_selection }}"
+        state: searched
+      register: available_updates
 
 - debug:
     msg: |
