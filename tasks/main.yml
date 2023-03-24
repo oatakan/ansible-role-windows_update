@@ -7,7 +7,7 @@
 - name: disable firewall for Domain, Public and Private profiles
   win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
   when: 
-    - "'Windows Server 2012' in ansible_distribution"
+    - "'Windows Server 2012' in ansible_distribution or 'Windows 8' in ansible_distribution"
     - windows_update_disable_firewall | bool
 
 - name: disable firewall for Domain, Public and Private profiles
@@ -58,11 +58,11 @@
 - name: enabled firewall for Domain, Public and Private profiles
   win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
   when: 
-    - "'Windows Server 2012' in ansible_distribution"
+    - "'Windows Server 2012' in ansible_distribution or 'Windows 8' in ansible_distribution"
     - windows_update_disable_firewall | bool
 
 - name: enable firewall for Domain, Public and Private profiles
-  win_shell: netsh advfirewall set  allprofiles state on
+  win_shell: netsh advfirewall set allprofiles state on
   when: 
     - "'Windows Server 2008' in ansible_distribution or 'Windows 7' in ansible_distribution"
     - windows_update_disable_firewall | bool
