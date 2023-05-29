@@ -106,12 +106,13 @@
       register: missing_updates
 
     - debug:
-        msg: |
+        msg: "{{ _msg.split('\n')[:-1] }}"
+      vars:
+        _msg: |
           {{ inventory_hostname }} has {{ missing_updates.found_update_count }} updates still missing.
           {% for update in updates %}
             - {{ update.title }}
           {% endfor %}
-      vars:
         updates: "{{ (missing_updates.updates.values() | list) if (missing_updates.updates is mapping) else (missing_updates.updates) }}"
       when: missing_updates.updates is defined
 
