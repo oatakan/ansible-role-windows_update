@@ -26,6 +26,12 @@
       when: available_updates.updates is defined
 
     - block:
+        - name: ensure there is connection
+          wait_for_connection:
+            delay: 60
+            sleep: 10
+            timeout: 600
+
         - name: install windows updates using powershell script
           script: win-updates.ps1
           become: yes

@@ -33,6 +33,12 @@
           when: installed_updates.reboot_required
 
       rescue:
+        - name: ensure there is connection
+          wait_for_connection:
+            delay: 60
+            sleep: 10
+            timeout: 600
+
         # see https://learn.microsoft.com/en-us/sharepoint/troubleshoot/administration/800703fa-illegal-operation-error
         # error code 0x800703FA happens with some updates when user is not logged in
         # add the registry key to disable forcefully unloading users registry at user logoff
