@@ -14,10 +14,43 @@
             category_names: "{{ win_update_category_names }}"
             reject_list: "{{ _reject_list | default(omit) }}"
             accept_list: "{{ win_update_accept_list | default(omit) }}"
-            reboot: yes
+            reboot: false
+          async: 7200
+          poll: 0
+          register: installed_updates_async
+
+        - name: wait for updates to finish
+          async_status:
+            jid: "{{ installed_updates_async.ansible_job_id }}"
           register: installed_updates
+          until: installed_updates.finished
+          retries: "{{ install_updates_retry_limit }}"
+          delay: 30
+
+        - name: reboot the system if required
+          win_reboot:
+            reboot_timeout: 7200
+          when: installed_updates.reboot_required
 
       rescue:
+        - name: ensure there is connection
+          wait_for_connection:
+            delay: 60
+            sleep: 10
+            timeout: 600
+
+        # see https://learn.microsoft.com/en-us/sharepoint/troubleshoot/administration/800703fa-illegal-operation-error
+        # error code 0x800703FA happens with some updates when user is not logged in
+        # add the registry key to disable forcefully unloading users registry at user logoff
+        - include_tasks: force_user_registry.yml
+          vars:
+            task_state: present
+          when:
+            - installed_updates is defined
+            - installed_updates is failed
+            - installed_updates.msg is defined
+            - ('0x800703FA' in installed_updates.msg)
+
         - name: reboot the system to recover from a failed update
           win_reboot:
             reboot_timeout: 7200
@@ -42,15 +75,30 @@
         delay: 60
         sleep: 10
         timeout: 600
+    - block:
+        - name: work on any skipped KB
+          win_updates:
+            server_selection: "{{ win_update_server_selection }}"
+            category_names: "{{ win_update_category_names }}"
+            reject_list: "{{ win_update_reject_list | default(omit) }}"
+            accept_list: "{{ failed_kb | default(omit) }}"
+            reboot: false
+          async: 7200
+          poll: 0
+          register: installed_updates_retry_skipped_async
 
-    - name: work on any skipped KB
-      win_updates:
-        server_selection: "{{ win_update_server_selection }}"
-        category_names: "{{ win_update_category_names }}"
-        reject_list: "{{ win_update_reject_list | default(omit) }}"
-        accept_list: "{{ failed_kb | default(omit) }}"
-        reboot: yes
-      register: installed_updates_retry_skipped
+        - name: wait for updates to finish
+          async_status:
+            jid: "{{ installed_updates_retry_skipped_async.ansible_job_id }}"
+          register: installed_updates_retry_skipped
+          until: installed_updates_retry_skipped.finished
+          retries: "{{ install_updates_retry_limit }}"
+          delay: 30
+
+        - name: reboot the system if required
+          win_reboot:
+            reboot_timeout: 7200
+          when: installed_updates_retry_skipped.reboot_required
       when:
         - failed_kb is defined
         - failed_kb | length > 0
@@ -64,12 +112,13 @@
       register: missing_updates
 
     - debug:
-        msg: |
+        msg: "{{ _msg.split('\n')[:-1] }}"
+      vars:
+        _msg: |
           {{ inventory_hostname }} has {{ missing_updates.found_update_count }} updates still missing.
           {% for update in updates %}
             - {{ update.title }}
           {% endfor %}
-      vars:
         updates: "{{ (missing_updates.updates.values() | list) if (missing_updates.updates is mapping) else (missing_updates.updates) }}"
       when: missing_updates.updates is defined
 

@@ -1,21 +1,29 @@
 ---
 
+install_updates_retry_limit: 300
 update_retry_count: 0
 update_retry_limit: 10
-win_update_category_names:
-  - CriticalUpdates
-  - DefinitionUpdates
-  - SecurityUpdates
-  - UpdateRollups
-  - Updates
+
+win_update_category_names: '*'
+#win_update_category_names:
+#  - CriticalUpdates
+#  - DefinitionUpdates
+#  - FeaturePacks
+#  - SecurityUpdates
+#  - UpdateRollups
+#  - Updates
 
 win_update_reject_list: []
 win_update_accept_list: []
 win_update_server_selection: default
+win_update_disable_firewall: yes
 failed_kb: []
 
+windows_update_disable_firewall: true
+
 temp_directory: "{{ ansible_env.TEMP }}"
-hotfix_download_location: "{{ temp_directory }}"
+
+windows_hotfix_role: oatakan.windows_hotfix
 
 hotfixes:
   - kb: KB3020369

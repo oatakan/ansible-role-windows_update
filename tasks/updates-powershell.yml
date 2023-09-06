@@ -15,16 +15,23 @@
       register: available_updates
 
     - debug:
-        msg: |
+        msg: "{{ _msg.split('\n')[:-1] }}"
+      vars:
+        _msg: |
           {{ inventory_hostname }} has {{ available_updates.found_update_count }} updates available.
           {% for update in updates %}
             - {{ update.title }}
           {% endfor %}
-      vars:
         updates: "{{ (available_updates.updates.values() | list) if (available_updates.updates is mapping) else (available_updates.updates) }}"
       when: available_updates.updates is defined
 
     - block:
+        - name: ensure there is connection
+          wait_for_connection:
+            delay: 60
+            sleep: 10
+            timeout: 600
+
         - name: install windows updates using powershell script
           script: win-updates.ps1
           become: yes
@@ -69,12 +76,13 @@
       register: missing_updates
 
     - debug:
-        msg: |
+        msg: "{{ _msg.split('\n')[:-1] }}"
+      vars:
+        _msg: |
           {{ inventory_hostname }} has {{ missing_updates.found_update_count }} updates still missing.
           {% for update in updates %}
             - {{ update.title }}
           {% endfor %}
-      vars:
         updates: "{{ (missing_updates.updates.values() | list) if (missing_updates.updates is mapping) else (missing_updates.updates) }}"
       when: missing_updates.updates is defined
 
