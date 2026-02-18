@@ -11,6 +11,11 @@ Requirements
 Role Variables
 --------------
 
+For legacy `PowerShell < 5` hosts that can fail update search with `HRESULT 0x80072EFE`, this role can apply a targeted hotfix remediation before retrying:
+
+- `win_update_ps3_hresult_0x80072efe_fix_enabled` (default: `true`)
+- `win_update_ps3_hresult_0x80072efe_hotfixes` (default includes `KB3172605`)
+
 Dependencies
 ------------
 

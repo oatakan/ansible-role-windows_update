@@ -3,6 +3,7 @@
 install_updates_retry_limit: 300
 update_retry_count: 0
 update_retry_limit: 10
+update_rescue_retry_limit: 3
 
 win_update_category_names: '*'
 #win_update_category_names:
@@ -24,6 +25,18 @@ windows_update_disable_firewall: true
 temp_directory: "{{ ansible_env.TEMP }}"
 
 windows_hotfix_role: oatakan.windows_hotfix
+
+win_update_ps3_hresult_0x80072efe_fix_enabled: true
+win_update_ps3_force_script_on_hresult_0x80072efe: true
+win_update_ps3_hresult_0x80072efe_hotfixes:
+  - kb: KB3020369
+    reboot: false
+    file: Windows6.1-KB3020369-x64.msu
+    url: https://download.microsoft.com/download/F/D/3/FD3728D5-0D2F-44A6-B7DA-1215CC0C9B75/Windows6.1-KB3020369-x64.msu
+  - kb: KB3172605
+    reboot: false
+    file: windows6.1-kb3172605-x64_2bb9bc55f347eee34b1454b50c436eb6fd9301fc.msu
+    url: https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/updt/2016/09/windows6.1-kb3172605-x64_2bb9bc55f347eee34b1454b50c436eb6fd9301fc.msu
 
 hotfixes:
   - kb: KB3020369

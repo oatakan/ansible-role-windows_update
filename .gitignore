@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# IDEs/editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ansible
+.ansible/
+*.retry
+
+# Python caches/virtual environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/

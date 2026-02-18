@@ -2,6 +2,28 @@
 
 - name: update over multiple reboots
   block:
+    - name: set role-local update script path
+      set_fact:
+        _win_updates_script_path: "{{ (role_path | default(playbook_dir ~ '/..')) ~ '/files/win-updates.ps1' }}"
+
+    - name: initialize legacy remediation failure guard
+      set_fact:
+        _legacy_search_remediation_blocked: "{{ _legacy_search_remediation_blocked | default(false) }}"
+
+    - name: ensure Windows Update service is enabled and running for legacy search
+      win_service:
+        name: wuauserv
+        start_mode: manual
+        state: started
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
+    - name: ensure BITS service is enabled and running for legacy search
+      win_service:
+        name: bits
+        start_mode: manual
+        state: started
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
     - name: check for available updates
       win_updates:
         server_selection: "{{ win_update_server_selection }}"
@@ -13,6 +35,145 @@
           - Updates
         state: searched
       register: available_updates
+      when: (ansible_powershell_version | default('5.0') | string) is version('5.0', '>=')
+
+    - name: check for available updates on PowerShell < 5
+      win_shell: |
+        $ErrorActionPreference = 'Stop'
+        $session = New-Object -ComObject 'Microsoft.Update.Session'
+        $searcher = $session.CreateUpdateSearcher()
+        try {
+          $result = $searcher.Search("IsInstalled=0 and Type='Software' and IsHidden=0")
+          [PSCustomObject]@{
+            found_update_count = $result.Updates.Count
+            search_status = 'ok'
+          } | ConvertTo-Json -Compress
+        } catch {
+          if ($_.Exception.Message -match '0x80072EFE') {
+            [PSCustomObject]@{
+              found_update_count = 0
+              search_status = 'hresult_0x80072EFE'
+            } | ConvertTo-Json -Compress
+          } elseif ($_.Exception.Message -match '0x80070422') {
+            [PSCustomObject]@{
+              found_update_count = 0
+              search_status = 'hresult_0x80070422'
+            } | ConvertTo-Json -Compress
+          } else {
+            throw
+          }
+        }
+      register: available_updates_legacy
+      changed_when: false
+      retries: 6
+      delay: 20
+      until: available_updates_legacy.rc == 0
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
+    - name: normalize available update result on PowerShell < 5
+      set_fact:
+        available_updates: "{{ available_updates_legacy.stdout | from_json }}"
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
+    - name: note PowerShell < 5 search fallback result
+      debug:
+        msg: "PowerShell < 5 update search returned HRESULT 0x80072EFE; treating as zero available updates for this pass."
+      when:
+        - (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+        - available_updates.search_status | default('ok') == 'hresult_0x80072EFE'
+
+    - name: note PowerShell < 5 search service-disabled result
+      debug:
+        msg: "PowerShell < 5 update search returned HRESULT 0x80070422 (service disabled/unavailable); treating as zero available updates for this pass."
+      when:
+        - (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+        - available_updates.search_status | default('ok') == 'hresult_0x80070422'
+
+    - name: determine if legacy search remediation is required
+      set_fact:
+        _legacy_search_needs_remediation: "{{ (ansible_powershell_version | default('0') | string) is version('5.0', '<') and (available_updates.search_status | default('ok')) == 'hresult_0x80072EFE' and (win_update_ps3_hresult_0x80072efe_fix_enabled | bool) and not (_legacy_search_remediation_blocked | bool) }}"
+
+    - name: install remediation hotfixes for PowerShell < 5 search HRESULT 0x80072EFE
+      block:
+        - name: install remediation hotfixes for PowerShell < 5 search HRESULT 0x80072EFE
+          include_role:
+            name: "{{ windows_hotfix_role }}"
+          loop: "{{ win_update_ps3_hresult_0x80072efe_hotfixes }}"
+          loop_control:
+            loop_var: hotfix
+      rescue:
+        - name: block further remediation attempts for this run
+          set_fact:
+            _legacy_search_remediation_blocked: true
+
+        - name: note remediation failure and continue update flow
+          debug:
+            msg: "PowerShell < 5 remediation hotfix install failed; skipping further remediation attempts in this run and continuing update flow."
+      when: _legacy_search_needs_remediation
+
+    - name: reboot after remediation hotfixes
+      block:
+        - name: reboot with win_reboot after remediation
+          win_reboot:
+            reboot_timeout: 7200
+      rescue:
+        - name: fallback reboot via shell after remediation
+          win_shell: Restart-Computer -Force
+          async: 30
+          poll: 0
+          ignore_errors: true
+
+        - name: wait for connection after remediation fallback reboot
+          wait_for_connection:
+            delay: 20
+            sleep: 10
+            timeout: 1200
+      when: _legacy_search_needs_remediation
+
+    - name: wait for system to be responsive after remediation reboot
+      wait_for_connection:
+        delay: 60
+        sleep: 10
+        timeout: 600
+      when: _legacy_search_needs_remediation
+
+    - name: re-check available updates on PowerShell < 5 after remediation
+      win_shell: |
+        $ErrorActionPreference = 'Stop'
+        $session = New-Object -ComObject 'Microsoft.Update.Session'
+        $searcher = $session.CreateUpdateSearcher()
+        try {
+          $result = $searcher.Search("IsInstalled=0 and Type='Software' and IsHidden=0")
+          [PSCustomObject]@{
+            found_update_count = $result.Updates.Count
+            search_status = 'ok'
+          } | ConvertTo-Json -Compress
+        } catch {
+          if ($_.Exception.Message -match '0x80072EFE') {
+            [PSCustomObject]@{
+              found_update_count = 0
+              search_status = 'hresult_0x80072EFE'
+            } | ConvertTo-Json -Compress
+          } elseif ($_.Exception.Message -match '0x80070422') {
+            [PSCustomObject]@{
+              found_update_count = 0
+              search_status = 'hresult_0x80070422'
+            } | ConvertTo-Json -Compress
+          } else {
+            throw
+          }
+        }
+      register: available_updates_legacy_after_remediation
+      changed_when: false
+      retries: 6
+      delay: 20
+      until: available_updates_legacy_after_remediation.rc == 0
+      when: _legacy_search_needs_remediation
+
+    - name: normalize available update result on PowerShell < 5 after remediation
+      set_fact:
+        available_updates: "{{ available_updates_legacy_after_remediation.stdout | from_json }}"
+      when: _legacy_search_needs_remediation
 
     - debug:
         msg: "{{ _msg.split('\n')[:-1] }}"
@@ -33,18 +194,22 @@
             timeout: 600
 
         - name: install windows updates using powershell script
-          script: win-updates.ps1
-          become: yes
+          script: "{{ _win_updates_script_path }}"
+          become: true
           become_method: runas
           become_user: SYSTEM
           when:
-            - available_updates.updates is defined
-            - available_updates.found_update_count > 0
+            - available_updates.found_update_count > 0 or (
+                (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+                and (available_updates.search_status | default('ok')) == 'hresult_0x80072EFE'
+                and (win_update_ps3_force_script_on_hresult_0x80072efe | bool)
+              )
 
       rescue:
         - name: reboot the system to recover from a failed update
           win_reboot:
             reboot_timeout: 7200
+          failed_when: false
 
     - name: wait for system to be responsive after update
       wait_for_connection:
@@ -59,13 +224,27 @@
       register: update_reboot_required_key
 
     - name: reboot the system to continue with the update
-      win_reboot:
-        reboot_timeout: 7200
+      block:
+        - name: reboot with win_reboot
+          win_reboot:
+            reboot_timeout: 7200
+      rescue:
+        - name: fallback reboot via shell when win_reboot fails
+          win_shell: Restart-Computer -Force
+          async: 30
+          poll: 0
+          ignore_errors: true
+
+        - name: wait for connection after fallback reboot
+          wait_for_connection:
+            delay: 20
+            sleep: 10
+            timeout: 1200
       when: update_reboot_required_key.exists
 
     - name: check for missing updates
-      server_selection: "{{ win_update_server_selection }}"
       win_updates:
+        server_selection: "{{ win_update_server_selection }}"
         category_names:
           - CriticalUpdates
           - DefinitionUpdates
@@ -74,6 +253,54 @@
           - Updates
         state: searched
       register: missing_updates
+      when: (ansible_powershell_version | default('5.0') | string) is version('5.0', '>=')
+
+    - name: check for missing updates on PowerShell < 5
+      win_shell: |
+        $ErrorActionPreference = 'Stop'
+        $session = New-Object -ComObject 'Microsoft.Update.Session'
+        $searcher = $session.CreateUpdateSearcher()
+        try {
+          $result = $searcher.Search("IsInstalled=0 and Type='Software' and IsHidden=0")
+          [PSCustomObject]@{
+            found_update_count = $result.Updates.Count
+            search_status = 'ok'
+          } | ConvertTo-Json -Compress
+        } catch {
+          if ($_.Exception.Message -match '0x80072EFE') {
+            [PSCustomObject]@{
+              found_update_count = 0
+              search_status = 'hresult_0x80072EFE'
+            } | ConvertTo-Json -Compress
+          } else {
+            throw
+          }
+        }
+      register: missing_updates_legacy
+      changed_when: false
+      retries: 6
+      delay: 20
+      until: missing_updates_legacy.rc == 0
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
+    - name: normalize missing update result on PowerShell < 5
+      set_fact:
+        missing_updates: "{{ missing_updates_legacy.stdout | from_json }}"
+      when: (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+
+    - name: note PowerShell < 5 missing-search fallback result
+      debug:
+        msg: "PowerShell < 5 missing-update search returned HRESULT 0x80072EFE; treating as zero missing updates for this pass."
+      when:
+        - (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+        - missing_updates.search_status | default('ok') == 'hresult_0x80072EFE'
+
+    - name: note PowerShell < 5 missing-search service-disabled result
+      debug:
+        msg: "PowerShell < 5 missing-update search returned HRESULT 0x80070422 (service disabled/unavailable); treating as zero missing updates for this pass."
+      when:
+        - (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+        - missing_updates.search_status | default('ok') == 'hresult_0x80070422'
 
     - debug:
         msg: "{{ _msg.split('\n')[:-1] }}"
@@ -105,8 +332,30 @@
         name: CustomRebootRequired
         state: absent
 
-  rescue:
-    - debug:
-        msg: "Still more updates remaining - retrying..."
+    - name: fail in deterministic mode when final update state is indeterminate on PowerShell < 5
+      fail:
+        msg: >
+          PowerShell < 5 update flow ended in an indeterminate search state
+          (available={{ available_updates.search_status | default('ok') }},
+          missing={{ missing_updates.search_status | default('ok') }}).
+          A definitive search result is required for deterministic execution.
+      when:
+        - (ansible_powershell_version | default('0') | string) is version('5.0', '<')
+        - (available_updates.search_status | default('ok')) in ['hresult_0x80072EFE', 'hresult_0x80070422'] or (missing_updates.search_status | default('ok')) in ['hresult_0x80072EFE', 'hresult_0x80070422']
 
-    - include_tasks: updates-powershell.yml
+  rescue:
+    - name: increment legacy update rescue count
+      set_fact:
+        update_rescue_retry_count: "{{ update_rescue_retry_count | default(0) | int + 1 }}"
+
+    - debug:
+        msg: "Still more updates remaining - retrying (attempt {{ update_rescue_retry_count }} of {{ update_rescue_retry_limit | default(3) | int }})..."
+
+    - name: retry legacy update flow
+      include_tasks: updates-powershell.yml
+      when: (update_rescue_retry_count | int) < (update_rescue_retry_limit | default(3) | int)
+
+    - name: stop after legacy rescue retry limit is reached
+      fail:
+        msg: "Legacy update flow failed after {{ update_rescue_retry_count }} rescue attempts. Aborting to avoid infinite retry loop."
+      when: (update_rescue_retry_count | int) >= (update_rescue_retry_limit | default(3) | int)
